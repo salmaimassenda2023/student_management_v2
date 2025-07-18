@@ -1,12 +1,7 @@
 'use client'
 import {useState} from "react";
-import {
-    createUserWithEmailAndPassword,
-    GoogleAuthProvider,
-    signInWithPopup
-} from "firebase/auth";
-import {auth} from '@/firebase/firebase-client'
-import {router} from "next/client";
+import {useRouter} from "next/navigation";
+import {authService} from "@/utils/authService";
 
 
 export default function SignupPage(){
@@ -15,17 +10,17 @@ export default function SignupPage(){
     const [password,setPassword]=useState("");
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const router=useRouter();
+
+    // help function
 
     // implement Functions
     async function handelEmailPasswordSignUp(e) {
         e.preventDefault(); // Prevent default form submission behavior
         setLoading(true);
         try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const firebaseUser=userCredential.user;
-            // 2. Setup user profile and role in Supabase via your API bridge
-
-            // 3 . Redirect
+            await authService.registerWithEmail(email, password);
+            alert('Registration successful! You are now logged in.');
             await router.push("/students")
         } catch(error) {
             console.error("Error Signin Up with Email/password",error)
@@ -37,13 +32,8 @@ export default function SignupPage(){
     async function handelGoogleSignUp() {
         setGoogleLoading(true);
         try {
-            // 1. Sign in with Google using Firebase
-            const provider = new GoogleAuthProvider();
-            const result = await signInWithPopup(auth, provider);
-            const firebaseUser = result.user;
-            // 2. Setup user profile and role in Supabase via your API bridge
-
-            // 3 . Redirect
+            await authService.registerWithGoogle();
+            alert('Registration successful! You are now logged in.');
             await router.push("/students")
 
         } catch (error) {
