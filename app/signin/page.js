@@ -1,7 +1,10 @@
 "use client"
 import {useState} from "react";
 import {useRouter} from "next/navigation";
-import {authService} from "@/utils/authService";
+import {useSupabaseAuth} from "@/utils/SupabaseAuthProvider";
+import {GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup} from "firebase/auth";
+import {auth} from "@/firebase/firebase-client";
+
 
 export default function SignInPage(){
     // initialize states
@@ -11,16 +14,24 @@ export default function SignInPage(){
     const [googleLoading, setGoogleLoading] = useState(false);
     const router = useRouter();
 
+
+
+
+    // Get loginWithFirebaseToken function
+    const {loginWithFirebaseToken}=useSupabaseAuth();
     // Functions
 
     async function handelSignInWithCredentials(e) {
         e.preventDefault();
         setLoading(true)
         try {
-            await authService.signInWithEmail(email, password);
-            await router.push("/students");
+
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const firebaseIdToken =await userCredential.user.getIdToken();
+            await loginWithFirebaseToken(firebaseIdToken);
+            await router.push("/drivers");
         } catch (error) {
-            console.error("Error lors de l'inscription !!", error)
+            console.error("Error lors de la connexion !!", error)
         } finally {
             setLoading(false)
         }
@@ -29,8 +40,10 @@ export default function SignInPage(){
     async function handelGoogleSignIn() {
         setGoogleLoading(true);
         try {
-            await authService.signInWithGoogle();
-            await router.push("/students");
+            const userCredential = await signInWithPopup(auth, new GoogleAuthProvider());
+            const firebaseIdToken =await userCredential.user.getIdToken();
+            await loginWithFirebaseToken(firebaseIdToken);
+            await router.push("/drivers");
         } catch (error) {
             console.error("Error lors de l'inscription !!", error)
         } finally {

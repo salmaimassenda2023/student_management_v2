@@ -2,6 +2,9 @@
 import {useState} from "react";
 import {useRouter} from "next/navigation";
 import {authService} from "@/utils/authService";
+import {createUserWithEmailAndPassword} from "firebase/auth";
+import {auth} from "@/firebase/firebase-client";
+import {useSupabaseAuth} from "@/utils/SupabaseAuthProvider";
 
 
 export default function SignupPage(){
@@ -11,17 +14,20 @@ export default function SignupPage(){
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
     const router=useRouter();
+    // Get loginWithFirebaseToken function
+    const {loginWithFirebaseToken}=useSupabaseAuth();
 
-    // help function
 
     // implement Functions
     async function handelEmailPasswordSignUp(e) {
         e.preventDefault(); // Prevent default form submission behavior
         setLoading(true);
         try {
-            await authService.registerWithEmail(email, password);
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             alert('Registration successful! You are now logged in.');
-            await router.push("/students")
+            const firebaseIdToken =await userCredential.user.getIdToken();
+            await loginWithFirebaseToken(firebaseIdToken);
+            await router.push("/drivers");
         } catch(error) {
             console.error("Error Signin Up with Email/password",error)
         } finally {

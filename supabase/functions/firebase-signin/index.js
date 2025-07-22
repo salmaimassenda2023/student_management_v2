@@ -74,8 +74,8 @@ async function verifyFirebaseToken(token) {
 serve(async (req) => {
   // Debug environment variables
   console.log('=== Environment Check ===');
-  console.log('SUPABASE_URL:', Deno.env.get('SUPABAS_URL') ? 'Loaded' : 'NOT LOADED');
-  console.log('SUPABASE_SERVICE_ROLE_KEY:', Deno.env.get('SERVICE_ROLE_KEY') ? 'Loaded' : 'NOT LOADED');
+  console.log('SUPABASE_URL:', Deno.env.get('SUPABASE_URL') ? 'Loaded' : 'NOT LOADED');
+  console.log('SUPABASE_SERVICE_ROLE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'Loaded' : 'NOT LOADED');
   console.log('SUPABASE_JWT_SECRET:', Deno.env.get('JWT_SECRET') ? 'Loaded' : 'NOT LOADED');
   console.log('FIREBASE_PROJECT_ID:', Deno.env.get('FIREBASE_PROJECT_ID') ? 'Loaded' : 'NOT LOADED');
   console.log('FIREBASE_WEB_API_KEY:', Deno.env.get('FIREBASE_WEB_API_KEY') ? 'Loaded' : 'NOT LOADED');
@@ -114,7 +114,7 @@ serve(async (req) => {
 
     // 3. Initialize the Supabase Admin client
     const supabaseAdmin = createClient(
-        Deno.env.get('SUPABAS_URL') ?? '',
+        Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 

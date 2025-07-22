@@ -52,3 +52,65 @@ body {
   gap: 8px; /* Use gap for spacing between flex items */
   cursor: pointer;
 }
+/* styles/DriverList.module.css */
+
+.container {
+  padding: 20px;
+  max-width: 800px;
+  margin: 20px auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.heading {
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.loadingMessage,
+.noDriversMessage {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.errorMessage {
+  color: red;
+  text-align: center;
+  padding: 20px;
+}
+
+.driverList {
+  list-style: none;
+  padding: 0;
+}
+
+.driverListItem {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.driverName {
+  font-size: 1.1rem;
+  color: #007bff;
+}
+
+.driverDetail {
+  margin: 5px 0 0;
+  color: #555;
+}
+
+.driverDetailSmall {
+  margin: 2px 0 0;
+  color: #777;
+  font-size: 0.9rem;
+}
+
