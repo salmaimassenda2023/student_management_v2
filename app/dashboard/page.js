@@ -1,141 +1,156 @@
-// app/dashboard/page.js
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaEdit } from "react-icons/fa";
-import {useSupabaseAuth} from "@/utils/SupabaseAuthProvider"; // Using FaEdit for the edit button
+// Ensure this path is correct based on your project structure
+import { useSupabaseAuth } from "@/utils/SupabaseAuthProvider";
+import {supabase} from "@/utils/supabaseConfig";
 
 export default function DashboardPage() {
     const router = useRouter();
+    // Destructure accessToken, user, logout, and the supabase client from context
+    const { accessToken, user, logout } = useSupabaseAuth();
 
     const [users, setUsers] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true); // Initial loading for the whole page
     const [error, setError] = useState(null);
-    const [idToken, setIdToken] = useState(null);
     const [currentUserInfo, setCurrentUserInfo] = useState(null); // To store current user's role
     const [editingUser, setEditingUser] = useState(null); // User currently being edited
     const [newRole, setNewRole] = useState(""); // State for the new role input
 
-    const allowedRoles = ['user', 'manager', 'admin']; // Define roles here for client-side dropdown
+    const allowedRoles = ['CLIENT', 'MANAGER', 'ADMIN']; // Ensure these match your Supabase user_type values
 
-    // Function to get the token from localStorage
-    const { accessToken, logout } = useSupabaseAuth();
-
-    // Initial check for token and redirection
+    // Effect 1: Authenticate user and set current user info
+    // This runs once when accessToken or user changes
     useEffect(() => {
-
-        if (!accessToken) {
-            router.push('/signin'); // No token found, redirect to sign-in
-        } else {
-            setIdToken(token);
+        if (!accessToken || !user) {
+            console.log("No access token or user found, redirecting to signin.");
+            router.push('/signin');
+            return; // Exit early
         }
-    }, [router]);
 
-    // Fetch current user's info to check role
-    useEffect(() => {
-        const fetchCurrentUserRole = async () => {
-            if (!idToken) return;
-            try {
-                let { data: users, error } = await supabase
-                    .from('users')
-                    .select('*')
-                    .eq()
-            } catch (err) {
-                console.error("Error fetching current user role:", err.message);
-                setError("Failed to verify user role. Please try again.");
-                localStorage.removeItem('firebaseIdToken');
-                router.push('/signin');
-            }
-        };
+        // Set current user info from the context's user object
+        setCurrentUserInfo({
+            uid: user.firebase_uid, // Assuming firebase_uid is stored
+            role: user.user_type,   // Assuming user_type is the role column
+            email: user.email,
+            id: user.id             // Supabase user ID
+        });
 
-        if (idToken) {
-            fetchCurrentUserRole();
-        }
-    }, [idToken, router]);
+        // After successfully determining user, stop initial page loading.
+        // The table's loading state will be managed by the fetchUsers useEffect.
+        setIsLoading(false);
 
+    }, [accessToken, user, router]); // Dependencies: accessToken, user, router
 
-    // Fetch all users when idToken and current user info are available and admin role is confirmed
+    // Effect 2: Fetch all users (dependent on currentUserInfo and supabase client)
     useEffect(() => {
         const fetchUsers = async () => {
-            if (!idToken || !currentUserInfo || currentUserInfo.role !== 'admin') {
-                setIsLoading(false); // Stop loading if not authorized or token/info missing
+            // Check for supabase client and user authorization BEFORE trying to fetch
+            if (!supabase) {
+                console.warn("Supabase client is not yet available. Cannot fetch users.");
+                return; // Don't proceed if supabase is undefined
+            }
+
+            // This is an admin dashboard, so only ADMINs should fetch the user list.
+            // If the user is not an ADMIN, stop here.
+            if (!currentUserInfo || currentUserInfo.role !== 'CLIENT') {
+                console.log("Not authorized to fetch users (requires ADMIN role).");
+                // Don't set isLoading(false) here, as it's for unauthorized access and initial loading is handled
                 return;
             }
 
-            setIsLoading(true);
+            setIsLoading(true); // Start loading for the user list specifically
+            setError(null); // Clear previous errors
+
             try {
-                const res = await fetch("/api/admin-profile-setup", { // Assuming your GET API is at /api/admin/list-users
-                    headers: { 'Authorization': `Bearer ${idToken}` },
-                });
+                // Use the Supabase client to fetch users
+                const { data: fetchedUsers, error: fetchError } = await supabase
+                    .from('users') // Your users table name
+                    .select('id, firebase_uid, email, user_type, full_name, created_at, updated_at'); // Explicitly select columns
 
-                if (res.status === 401 || res.status === 403) {
-                    console.warn("Unauthorized to list users. Redirecting.");
-                    localStorage.removeItem('firebaseIdToken');
-                    router.push('/signin');
-                    return;
+                if (fetchError) {
+                    console.error("Supabase fetch users error:", fetchError.message);
+                    throw new Error(fetchError.message);
                 }
-                if (!res.ok) throw new Error("Failed to fetch users: " + res.statusText);
 
-                const data = await res.json();
-                setUsers(data.users);
+                // Map Supabase data to match your component's expected structure
+                const formattedUsers = fetchedUsers.map(u => ({
+                    id: u.id,
+                    uid: u.firebase_uid,
+                    email: u.email,
+                    role: u.user_type,
+                    createdAt: u.created_at,
+                    lastSignInTime: u.updated_at, // Assuming updated_at can serve as a proxy for last interaction/sign-in time
+                }));
+
+                setUsers(formattedUsers); // Update the state with fetched users
             } catch (err) {
                 console.error("Error fetching users:", err.message);
-                setError("Failed to load user data.");
+                setError("Failed to load user data: " + err.message);
+                if (err.message.includes("not authorized") || err.message.includes("permission denied")) {
+                    alert("Your session has expired or you are not authorized. Please log in again.");
+                    logout();
+                    router.push('/signin');
+                }
             } finally {
-                setIsLoading(false);
+                setIsLoading(false); // End loading for user list
             }
         };
 
-        if (idToken && currentUserInfo && currentUserInfo.role === 'admin') {
+        // Trigger fetchUsers only if currentUserInfo is set, it's an ADMIN, AND supabase is ready
+        if (currentUserInfo && currentUserInfo.role === 'CLIENT' && supabase) {
             fetchUsers();
         }
-    }, [idToken, currentUserInfo, router]); // Re-run when these dependencies change
 
-    const handleEditRole = (user) => {
-        setEditingUser(user);
-        setNewRole(user.role); // Set current role as default for editing
+    }, [currentUserInfo, router, logout, supabase]); // Dependencies for fetching users
+
+    const handleEditRole = (userToEdit) => {
+        setEditingUser(userToEdit);
+        setNewRole(userToEdit.role); // Set current role as default for editing
     };
 
     const handleUpdateRole = async () => {
-        if (!editingUser || !newRole || !idToken) return;
+        // Ensure all necessary data/clients are available before attempting update
+        if (!editingUser || !newRole || !accessToken || !supabase) {
+            console.error("Missing data for role update.");
+            return;
+        }
 
         setIsLoading(true); // Indicate loading for the update action
+        setError(null); // Clear previous errors
         try {
-            const res = await fetch("/api/admin-profile-setup", { // Your POST API route
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify({ uid: editingUser.uid, role: newRole }),
-            });
+            // Update the user's role in Supabase
+            const { data, error: updateError } = await supabase
+                .from('users')
+                .update({ user_type: newRole, updated_at: new Date().toISOString() }) // Assuming 'user_type' is your role column
+                .eq('id', editingUser.id); // Use the Supabase 'id' for updating
 
-            if (res.status === 401 || res.status === 403) {
-                console.warn("Unauthorized to update role. Redirecting.");
-                localStorage.removeItem('firebaseIdToken');
-                router.push('/signin');
-                return;
-            }
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(`Failed to update role: ${errorData.message || res.statusText}`);
+            if (updateError) {
+                console.error('Supabase update error:', updateError);
+                throw new Error(updateError.message);
             }
 
-            // Update the user's role in the local state
+            // Update the user's role in the local state to reflect the change immediately
             setUsers(prevUsers =>
-                prevUsers.map(user =>
-                    user.uid === editingUser.uid ? { ...user, role: newRole } : user
+                prevUsers.map(userItem =>
+                    userItem.id === editingUser.id ? { ...userItem, role: newRole } : userItem
                 )
             );
             setEditingUser(null); // Exit editing mode
             setNewRole(""); // Clear new role state
-            alert("Rôle mis à jour avec succès!"); // Success feedback
+            alert("Rôle mis à jour avec succès! 🎉"); // Success feedback
         } catch (err) {
             console.error("Error updating user role:", err.message);
             setError(`Erreur lors de la mise à jour du rôle: ${err.message}`);
+            if (err.message.includes("not authorized") || err.message.includes("permission denied")) {
+                alert("Your session has expired or you are not authorized to update roles. Please log in again.");
+                logout();
+                router.push('/signin');
+            }
         } finally {
-            setIsLoading(false);
+            setIsLoading(false); // End loading for update action
         }
     };
 
@@ -145,14 +160,13 @@ export default function DashboardPage() {
     };
 
     const handleLogout = () => {
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem('firebaseIdToken');
-        }
+        logout(); // Call the logout function from your context
         router.push('/signin');
     };
 
     // --- Loading and Authorization States ---
-    if (isLoading || !idToken || !currentUserInfo) {
+    // Show a general loading message if authentication info isn't fully loaded yet.
+    if (!accessToken || !user || !currentUserInfo) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-black dark:text-white">
                 <p className="text-xl font-semibold">Chargement du tableau de bord...</p>
@@ -160,6 +174,7 @@ export default function DashboardPage() {
         );
     }
 
+    // Display error message if there's a problem fetching data
     if (error) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gray-50 dark:bg-gray-900 text-red-500">
@@ -174,15 +189,15 @@ export default function DashboardPage() {
         );
     }
 
-    // This condition means user info loaded, but they are not an admin
-    if (currentUserInfo && currentUserInfo.role !== 'admin') {
-        // The useEffect should have already redirected them, but as a fallback
+    // Access control: Only ADMINs can view this page.
+    // This check runs AFTER currentUserInfo is surely available.
+    if (currentUserInfo.role !== 'CLIENT') {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-red-500">
-                <p className="text-xl font-semibold">Accès Refusé. Seuls les administrateurs peuvent accéder à cette page.</p>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 text-red-500 flex-col">
+                <p className="text-xl font-semibold mb-4">Accès Refusé. Seuls les administrateurs peuvent accéder à cette page. 🚫</p>
                 <button
                     onClick={() => router.push('/')}
-                    className="mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
+                    className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
                 >
                     Retour à l'accueil
                 </button>
@@ -190,11 +205,11 @@ export default function DashboardPage() {
         );
     }
 
-    // --- Main Dashboard Content ---
+    // --- Main Dashboard Content (rendered only for authenticated ADMINs) ---
     return (
         <div className="min-h-screen flex flex-col items-center justify-start p-8 gap-8 bg-gray-50 dark:bg-gray-900 text-black dark:text-white">
             <div className="w-full flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold">Tableau de bord administrateur</h1>
+                <h1 className="text-3xl font-bold">Tableau de bord administrateur 📊</h1>
                 <button
                     onClick={handleLogout}
                     className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded"
@@ -202,28 +217,35 @@ export default function DashboardPage() {
                     Déconnexion
                 </button>
             </div>
+            {/* Display current user's full_name and user_type */}
+            {user && (
+                <h1 className="text-2xl font-semibold">Bienvenue, {user.full_name} ({user.user_type}) 👋</h1>
+            )}
 
             <div className="w-full max-w-5xl">
                 <h2 className="text-xl font-semibold mb-4">Gestion des utilisateurs</h2>
-                {users.length === 0 ? (
-                    <p>Aucun utilisateur trouvé.</p>
+                {isLoading ? ( // Show loading indicator specifically for the user list content
+                    <p className="text-lg">Chargement des utilisateurs...</p>
+                ) : users.length === 0 ? (
+                    <p className="text-lg">Aucun utilisateur trouvé.</p>
                 ) : (
                     <table className="w-full table-auto border-collapse border border-gray-300 dark:border-gray-700">
                         <thead className="bg-gray-200 dark:bg-gray-800">
+                        {/* FIX FOR HYDRATION ERROR: NO WHITESPACE BETWEEN <th> TAGS */}
                         <tr>
-                            <th className="border px-4 py-2 text-left">Email</th>
-                            <th className="border px-4 py-2 text-left">Rôle</th>
-                            <th className="border px-4 py-2 text-center">Créé le</th>
-                            <th className="border px-4 py-2 text-center">Dernière connexion</th>
-                            <th className="border px-4 py-2 text-center">Action</th>
+                            <th>Email</th>
+                            <th>Rôle</th>
+                            <th>Créé le</th>
+                            <th>Dernière maj.</th>
+                            <th>Action</th>
                         </tr>
                         </thead>
                         <tbody>
-                        {users.map((user) => (
-                            <tr key={user.uid} className="hover:bg-gray-100 dark:hover:bg-gray-700">
-                                <td className="border px-4 py-2">{user.email}</td>
+                        {users.map((userItem) => (
+                            <tr key={userItem.id} className="hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <td className="border px-4 py-2">{userItem.email}</td>
                                 <td className="border px-4 py-2">
-                                    {editingUser?.uid === user.uid ? (
+                                    {editingUser?.id === userItem.id ? (
                                         <select
                                             value={newRole}
                                             onChange={(e) => setNewRole(e.target.value)}
@@ -234,22 +256,23 @@ export default function DashboardPage() {
                                             ))}
                                         </select>
                                     ) : (
-                                        user.role
+                                        userItem.role
                                     )}
                                 </td>
                                 <td className="border px-4 py-2 text-center text-sm">
-                                    {new Date(user.createdAt).toLocaleDateString()}
+                                    {userItem.createdAt ? new Date(userItem.createdAt).toLocaleDateString() : 'N/A'}
                                 </td>
                                 <td className="border px-4 py-2 text-center text-sm">
-                                    {new Date(user.lastSignInTime).toLocaleDateString()}
+                                    {userItem.lastSignInTime ? new Date(userItem.lastSignInTime).toLocaleDateString() : 'N/A'}
                                 </td>
                                 <td className="border px-4 py-2 text-center space-x-2">
-                                    {editingUser?.uid === user.uid ? (
+                                    {editingUser?.id === userItem.id ? (
                                         <>
                                             <button
                                                 onClick={handleUpdateRole}
                                                 className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
-                                                disabled={isLoading || (user.uid === currentUserInfo.uid && newRole !== 'admin')} // Prevent admin demoting self
+                                                // Prevent admin demoting self
+                                                disabled={isLoading || (userItem.id === currentUserInfo.id && newRole !== 'ADMIN')}
                                             >
                                                 Mettre à jour
                                             </button>
@@ -263,9 +286,10 @@ export default function DashboardPage() {
                                         </>
                                     ) : (
                                         <button
-                                            onClick={() => handleEditRole(user)}
+                                            onClick={() => handleEditRole(userItem)}
                                             className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                                            disabled={isLoading || user.uid === currentUserInfo.uid} // Admin cannot edit their own role via this UI to prevent accidental lockout
+                                            // Admin cannot edit their own role via this UI to prevent accidental lockout
+                                            disabled={isLoading || userItem.id === currentUserInfo.id}
                                         >
                                             <FaEdit />
                                         </button>

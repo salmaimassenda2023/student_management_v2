@@ -1,9 +1,9 @@
 "use client"
 import {useState} from "react";
 import {useRouter} from "next/navigation";
-import {useSupabaseAuth} from "@/utils/SupabaseAuthProvider";
 import {GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup} from "firebase/auth";
 import {auth} from "@/firebase/firebase-client";
+import {useSupabase} from "@/utils/SupabaseAuthProvider";
 
 
 export default function SignInPage(){
@@ -18,7 +18,7 @@ export default function SignInPage(){
 
 
     // Get loginWithFirebaseToken function
-    const {loginWithFirebaseToken}=useSupabaseAuth();
+    const {loginWithFirebaseToken}=useSupabase();
     // Functions
 
     async function handelSignInWithCredentials(e) {

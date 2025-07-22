@@ -76,7 +76,7 @@ serve(async (req) => {
   console.log('=== Environment Check ===');
   console.log('SUPABASE_URL:', Deno.env.get('SUPABASE_URL') ? 'Loaded' : 'NOT LOADED');
   console.log('SUPABASE_SERVICE_ROLE_KEY:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'Loaded' : 'NOT LOADED');
-  console.log('SUPABASE_JWT_SECRET:', Deno.env.get('JWT_SECRET') ? 'Loaded' : 'NOT LOADED');
+  console.log('SUPABASE_JWT_SECRET:', Deno.env.get('SUPABASE_JWT_SECRET') ? 'Loaded' : 'NOT LOADED');
   console.log('FIREBASE_PROJECT_ID:', Deno.env.get('FIREBASE_PROJECT_ID') ? 'Loaded' : 'NOT LOADED');
   console.log('FIREBASE_WEB_API_KEY:', Deno.env.get('FIREBASE_WEB_API_KEY') ? 'Loaded' : 'NOT LOADED');
 
@@ -146,7 +146,7 @@ serve(async (req) => {
 
     // 5. Create a Supabase JWT
     console.log('=== Creating Supabase JWT ===');
-    const jwtSecret = Deno.env.get('JWT_SECRET');
+    const jwtSecret ='185bdb26-52a4-4ba4-9855-9f3c3922e764';
     if (!jwtSecret) {
       throw new Error('SUPABASE_JWT_SECRET environment variable is not set');
     }
